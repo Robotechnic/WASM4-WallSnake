@@ -3,6 +3,8 @@
 A snake game written in C for the [WASM-4](https://wasm4.org) fantasy console.
 This game follow the google snake walls game rules. 
 
+You can try it out here: https://robotechnic.github.io/WASM4-WallSnake/
+
 ## Building
 
 Build the cart by running:
