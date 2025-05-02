@@ -41,11 +41,12 @@ struct snake {
     uint8_t direction;
 };
 
-#define CURRENT_VERSION 2
-struct highscore {
+#define CURRENT_VERSION 3
+struct saved_data {
     uint8_t version;
     uint8_t scores[5];
     char names[5][6];
+    uint64_t seed;
 };
 
 typedef uint8_t grid_t[GRID_WIDTH][GRID_WIDTH];
@@ -217,7 +218,7 @@ int place_wall(grid_t grid, const struct snake *snake) {
     return 0;
 }
 
-void put_highscore(struct highscore *highscore, uint8_t score, const char *name) {
+void put_highscore(struct saved_data *highscore, uint8_t score, const char *name) {
     for (int i = 0; i < 5; i++) {
         if (highscore->scores[i] < score) {
             for (int j = 4; j > i; j--) {
@@ -231,7 +232,7 @@ void put_highscore(struct highscore *highscore, uint8_t score, const char *name)
     }
 }
 
-int is_highscore(const struct highscore *highscore, uint8_t score) {
+int is_highscore(const struct saved_data *highscore, uint8_t score) {
     for (int i = 0; i < 5; i++) {
         if (highscore->scores[i] < score) {
             return 1;
@@ -240,19 +241,20 @@ int is_highscore(const struct highscore *highscore, uint8_t score) {
     return 0;
 }
 
-void load_highscore(struct highscore *highscore) {
-    diskr(highscore, sizeof(struct highscore));
+void load_highscore(struct saved_data *highscore) {
+    diskr(highscore, sizeof(struct saved_data));
     if (highscore->version != CURRENT_VERSION) {
         highscore->version = CURRENT_VERSION;
         for (int i = 0; i < 5; i++) {
             highscore->scores[i] = 0;
             memcpy(highscore->names[i], "AAAAA", sizeof(highscore->names[i]));
         }
+        highscore->seed = 424242;
     }
 }
 
-void save_highscore(const struct highscore *highscore) {
-    diskw(highscore, sizeof(struct highscore));
+void save_highscore(const struct saved_data *highscore) {
+    diskw(highscore, sizeof(struct saved_data));
 }
 
 void draw_grid(const grid_t grid, const struct snake *snake) {
@@ -315,7 +317,7 @@ void draw_number(uint8_t number, int32_t x, int32_t y) {
 
 grid_t grid;
 struct snake snake;
-struct highscore highscore;
+struct saved_data saved_data;
 
 uint8_t apple_count;
 uint8_t status;
@@ -360,7 +362,7 @@ void start() {
     SET_FORBIDDEN(grid, GRID_WIDTH - 1, GRID_WIDTH - 2);
     SET_FORBIDDEN(grid, 0, GRID_WIDTH - 2);
     SET_FORBIDDEN(grid, 1, GRID_WIDTH - 1);
-    load_highscore(&highscore);
+    load_highscore(&saved_data);
 }
 
 void update() {
@@ -374,7 +376,10 @@ void update() {
     }
     switch (status) {
         case 0: // waiting for start
+            saved_data.seed++;
             if (pressed & BUTTON_1) {
+                save_highscore(&saved_data);
+                srand((unsigned long)saved_data.seed);
                 status = 1;
             }
             *DRAW_COLORS = 3;
@@ -382,8 +387,8 @@ void update() {
             text("Hi-scores", 45, 50);
             for (int i = 0; i < 5; i++) {
 #define LEFTOFFSET 38
-                text(highscore.names[i], LEFTOFFSET, 60 + i * 10);
-                draw_number(highscore.scores[i], LEFTOFFSET + 60, 60 + i * 10);
+                text(saved_data.names[i], LEFTOFFSET, 60 + i * 10);
+                draw_number(saved_data.scores[i], LEFTOFFSET + 60, 60 + i * 10);
             }
             break;
         case 1: // game running
@@ -419,7 +424,7 @@ void update() {
             break;
         case 2: // game over
             if (pressed & BUTTON_1) {
-                if (is_highscore(&highscore, score)) {
+                if (is_highscore(&saved_data, score)) {
                     status = 3;
                 } else {
                     start();
@@ -440,8 +445,8 @@ void update() {
                 frame_count = 0;
                 name[cursor] = name[cursor] == '}' ? ' ' : name[cursor] + 1;
             } else if (pressed & BUTTON_1) {
-                put_highscore(&highscore, score, name);
-                save_highscore(&highscore);
+                put_highscore(&saved_data, score, name);
+                save_highscore(&saved_data);
                 start();
             }
             *DRAW_COLORS = 3;
@@ -463,9 +468,9 @@ void update() {
     text("P:", 1, 1);
     draw_number(score, 18, 1);
     text("Hi:", 112, 1);
-    if (score > highscore.scores[0]) {
+    if (score > saved_data.scores[0]) {
         draw_number(score, 136, 1);
     } else {
-        draw_number(highscore.scores[0], 136, 1);
+        draw_number(saved_data.scores[0], 136, 1);
     }
 }
